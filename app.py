@@ -165,7 +165,7 @@ def main():
     st.markdown("""
     <div class="header-container">
         <div class="logo-container">
-            <img src="/volgoseo.png" alt="VOLGO SEO" class="header-logo">
+            <img src="volgoseo.png" alt="LOGO VOLGO SEO" class="header-logo">
         </div>
     </div>
     """, unsafe_allow_html=True)
