@@ -157,6 +157,10 @@ st.markdown("""
     gap: 1rem;
     margin: 1rem 0;
 }
+/* Togli padding container centrale Streamlit */
+div[data-testid="stMainBlockContainer"] {
+    padding: 0 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
