@@ -159,7 +159,7 @@ st.markdown("""
 }
 /* Togli padding container centrale Streamlit */
 div[data-testid="stMainBlockContainer"] {
-    padding: 0 20px !important;
+    padding: 0 50px !important;
 }
 </style>
 """, unsafe_allow_html=True)
