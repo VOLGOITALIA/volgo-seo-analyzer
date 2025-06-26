@@ -165,7 +165,7 @@ def main():
     st.markdown("""
     <div class="header-container">
         <div class="logo-container">
-            <img src="volgoseo.png" alt="LOGO VOLGO SEO" class="header-logo">
+            <img src="https://volgomail.it/logo.png" alt="LOGO VOLGO SEO" class="header-logo">
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -252,13 +252,6 @@ def main():
     if st.session_state.analysis_complete and st.session_state.seo_results:
         display_results(st.session_state.seo_results, st.session_state.analyzed_url)
     
-    # Footer nero con copyright
-    st.markdown("""
-    <div class="footer-container">
-        <p>© Copyright VOLGO Agenzia Pubblicitaria</p>
-    </div>
-    """, unsafe_allow_html=True)
-
 def display_recent_analyses(storage: AnalyticsStorage):
     """Mostra la sezione degli ultimi siti analizzati"""
     recent_analyses = storage.get_recent_analyses(limit=8)
