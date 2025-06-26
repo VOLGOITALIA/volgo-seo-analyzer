@@ -21,6 +21,9 @@ st.markdown("""
 <style>
 .stApp {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
 }
 .header-container {
     background-color: #000000;
@@ -58,7 +61,7 @@ st.markdown("""
     color: white;
     text-align: center;
     padding: 2rem;
-    margin: 3rem -1rem -1rem -1rem;
+    margin: 0 -1rem 0 -1rem;  /* togli margini top e bottom */
     width: 100vw;
     position: relative;
     left: 50%;
@@ -67,6 +70,7 @@ st.markdown("""
     margin-right: -50vw;
     font-size: 1rem;
     box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+    flex-shrink: 0; /* aggiungi questa! */
 }
 .metric-card {
     background: rgba(255, 255, 255, 0.95);
@@ -161,7 +165,7 @@ def main():
     st.markdown("""
     <div class="header-container">
         <div class="logo-container">
-            <img src="volgoseo.png" alt="VOLGO SEO" class="header-logo">
+            <img src="/volgoseo.png" alt="VOLGO SEO" class="header-logo">
         </div>
     </div>
     """, unsafe_allow_html=True)
