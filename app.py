@@ -175,7 +175,7 @@ def main():
     """, unsafe_allow_html=True)
     
     # Titolo principale fuori dall'header
-    st.markdown('<h1 class="main-header">Analisi SEO START Gratuita</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">Analisi SEO Gratuita</h1>', unsafe_allow_html=True)
     
     # Sottotitolo e disclaimer
     st.markdown("""
