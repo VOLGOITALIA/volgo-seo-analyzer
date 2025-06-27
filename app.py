@@ -175,13 +175,13 @@ def main():
     """, unsafe_allow_html=True)
     
     # Titolo principale fuori dall'header
-    st.markdown('<h1 class="main-header">Analisi SEO Gratuita</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 class="main-header">Analisi SEO START Gratuita</h1>', unsafe_allow_html=True)
     
     # Sottotitolo e disclaimer
     st.markdown("""
     <div style="text-align: center; margin-bottom: 2rem;">
         <p style="font-size: 1.2rem; color: #666; margin-bottom: 1rem;">
-            Analizza il tuo sito web e ottieni un report SEO dettagliato
+            Analizza il tuo sito web e ottieni un report SEO anche in PDF
         </p>
         <p style="font-size: 0.9rem; color: #888; font-style: italic; max-width: 800px; margin: 0 auto;">
             I dati forniti sono il risultato di un'analisi automatizzata che può presentare limitazioni. 
