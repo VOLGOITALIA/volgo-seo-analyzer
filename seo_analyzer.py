@@ -673,10 +673,23 @@ class SEOAnalyzer:
         return count
 
     def _get_canonical(self, soup: BeautifulSoup) -> str:
-        canonical = soup.find('link', rel='canonical')
-        if canonical and canonical.get('href'):
-            return canonical.get('href')
-        return ""
+    """Estrae il tag canonical in modo robusto (liste, maiuscole, spazi ecc.)"""
+    for link in soup.find_all('link'):
+        rel_attr = link.get('rel')
+        if not rel_attr:
+            continue
+
+        # rel può essere lista o stringa
+        if isinstance(rel_attr, list):
+            rel_values = [str(r).strip().lower() for r in rel_attr]
+        else:
+            # es: rel="canonical noopener"
+            rel_values = [s.strip().lower() for s in str(rel_attr).split()]
+
+        if 'canonical' in rel_values and link.get('href'):
+            return link.get('href')
+
+    return ""
 
     def _get_open_graph(self, soup: BeautifulSoup) -> Dict:
         og_tags = {}
@@ -1128,24 +1141,28 @@ class SEOAnalyzer:
         }
 
     def _analyze_canonical_tags(self, pages_data: List[Dict]) -> Dict:
+        """Analizza i tag canonical (o equivalenti og:url)"""
         issues = []
         recommendations = []
         pages_with_canonical = 0
 
         for page in pages_data:
             canonical = page.get('canonical', '')
+            og_url = page.get('open_graph', {}).get('og:url', '')
+            url = page.get('url', '')
 
-            if canonical:
+            # Considero valida la pagina se ha canonical OPPURE og:url
+            if canonical or og_url:
                 pages_with_canonical += 1
             else:
-                issues.append(f"Tag canonical mancante: {page['url']}")
+                issues.append(f"Tag canonical mancante: {url}")
 
         if pages_with_canonical < len(pages_data):
             recommendations.append(
-                "Se il CMS lo permette, aggiungi un tag canonical alle pagine principali"
+                "Se il CMS lo permette, aggiungi un tag canonical (o URL canonico) alle pagine principali"
             )
 
-        # Questo score NON influenza più il punteggio totale (peso 0 in calculate_overall_score)
+        # lo score continua a non pesare quasi nulla nel punteggio totale (peso 0)
         score = min(100, (pages_with_canonical / len(pages_data)) * 100) if pages_data else 0
 
         return {
@@ -1317,7 +1334,7 @@ class SEOAnalyzer:
                 'Stato HTTP': page.get('status_code', 'N/A'),
                 'Tempo Risposta (s)': f"{page.get('response_time', 0):.2f}",
                 'H1 Count': len(page.get('headings', {}).get('h1', [])),
-                'Canonical': 'Sì' if page.get('canonical') else 'No',
+                'Canonical': 'Sì' if (page.get('canonical') or page.get('open_graph', {}).get('og:url')) else 'No',
                 'Favicon': 'Sì' if page.get('has_favicon') else 'No'
             })
 
