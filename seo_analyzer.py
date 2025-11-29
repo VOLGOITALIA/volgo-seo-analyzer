@@ -673,23 +673,23 @@ class SEOAnalyzer:
         return count
 
     def _get_canonical(self, soup: BeautifulSoup) -> str:
-    """Estrae il tag canonical in modo robusto (liste, maiuscole, spazi ecc.)"""
-    for link in soup.find_all('link'):
-        rel_attr = link.get('rel')
-        if not rel_attr:
-            continue
+        """Estrae il tag canonical in modo robusto (liste, maiuscole, spazi ecc.)"""
+        for link in soup.find_all('link'):
+            rel_attr = link.get('rel')
+            if not rel_attr:
+                continue
 
-        # rel può essere lista o stringa
-        if isinstance(rel_attr, list):
-            rel_values = [str(r).strip().lower() for r in rel_attr]
-        else:
-            # es: rel="canonical noopener"
-            rel_values = [s.strip().lower() for s in str(rel_attr).split()]
+            # rel può essere lista o stringa
+            if isinstance(rel_attr, list):
+                rel_values = [str(r).strip().lower() for r in rel_attr]
+            else:
+                # es: rel="canonical noopener"
+                rel_values = [s.strip().lower() for s in str(rel_attr).split()]
 
-        if 'canonical' in rel_values and link.get('href'):
-            return link.get('href')
+            if 'canonical' in rel_values and link.get('href'):
+                return link.get('href')
 
-    return ""
+        return ""
 
     def _get_open_graph(self, soup: BeautifulSoup) -> Dict:
         og_tags = {}
