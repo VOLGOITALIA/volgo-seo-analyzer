@@ -7,16 +7,52 @@ import re
 from collections import Counter
 import trafilatura
 from typing import List, Dict, Any
+import shutil
+import os
+
+# --- MODIFICA 1: NUOVI IMPORT SELENIUM ---
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
 class SEOAnalyzer:
     def __init__(self):
+        # --- MODIFICA 2: SETUP SELENIUM (CLOUD & LOCALE) ---
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+        try:
+            # Configurazione Streamlit Cloud
+            chrome_options.binary_location = "/usr/bin/chromium"
+            service = Service("/usr/bin/chromedriver")
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            print("✅ Selenium avviato (Cloud Mode)")
+        except Exception:
+            try:
+                # Fallback Locale
+                chrome_options.binary_location = ""
+                self.driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+                print("✅ Selenium avviato (Local Mode)")
+            except Exception as e:
+                print(f"❌ Errore Selenium: {e}")
+                self.driver = None
+
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         })
         self.max_pages = 50
-        self.timeout = 10
+        self.timeout = 20  # Aumentato per il rendering JS
     
+    def __del__(self):
+        if hasattr(self, 'driver') and self.driver:
+            self.driver.quit()
+
     def get_sitemap_urls(self, base_url: str) -> List[str]:
         """Trova e analizza tutte le sitemap del sito, incluse quelle nidificate"""
         found_sitemaps = []
@@ -60,7 +96,7 @@ class SEOAnalyzer:
             except:
                 continue
         
-        return found_sitemaps
+        return list(set(found_sitemaps)) # Deduplica
     
     def _parse_sitemap(self, sitemap_content: str, base_url: str, processed_sitemaps: set) -> List[str]:
         """Analizza il contenuto della sitemap XML e tutte le sitemap nidificate"""
@@ -109,77 +145,17 @@ class SEOAnalyzer:
                         urls.append(url)
         
         return urls
-    
-    def analyze_robots_txt(self, base_url: str) -> Dict:
-        """Analizza il file robots.txt"""
-        robots_data = {
-            'found': False,
-            'content': '',
-            'disallow_rules': [],
-            'allow_rules': [],
-            'crawl_delay': None,
-            'sitemap_urls': [],
-            'user_agents': []
-        }
-        
-        try:
-            robots_url = f"{base_url.rstrip('/')}/robots.txt"
-            response = self.session.get(robots_url, timeout=self.timeout)
-            
-            if response.status_code == 200:
-                robots_data['found'] = True
-                robots_data['content'] = response.text
-                
-                current_user_agent = None
-                for line in response.text.split('\n'):
-                    line = line.strip()
-                    if line.startswith('#') or not line:
-                        continue
-                    
-                    if line.lower().startswith('user-agent:'):
-                        current_user_agent = line.split(':', 1)[1].strip()
-                        if current_user_agent not in robots_data['user_agents']:
-                            robots_data['user_agents'].append(current_user_agent)
-                    
-                    elif line.lower().startswith('disallow:'):
-                        rule = line.split(':', 1)[1].strip()
-                        robots_data['disallow_rules'].append({
-                            'user_agent': current_user_agent,
-                            'rule': rule
-                        })
-                    
-                    elif line.lower().startswith('allow:'):
-                        rule = line.split(':', 1)[1].strip()
-                        robots_data['allow_rules'].append({
-                            'user_agent': current_user_agent,
-                            'rule': rule
-                        })
-                    
-                    elif line.lower().startswith('crawl-delay:'):
-                        delay = line.split(':', 1)[1].strip()
-                        try:
-                            robots_data['crawl_delay'] = int(delay)
-                        except:
-                            pass
-                    
-                    elif line.lower().startswith('sitemap:'):
-                        sitemap_url = line.split(':', 1)[1].strip()
-                        robots_data['sitemap_urls'].append(sitemap_url)
-        
-        except:
-            pass
-        
-        return robots_data
-    
+
     def extract_urls_from_sitemaps(self, sitemap_urls: List[str]) -> List[str]:
         """Estrae gli URL delle pagine dalle sitemap trovate"""
         page_urls = set()
+        processed_sitemaps = set() # Set per tracciare sitemap già processate
         
         for sitemap_url in sitemap_urls:
             try:
                 response = self.session.get(sitemap_url, timeout=self.timeout)
                 if response.status_code == 200:
-                    urls = self._parse_sitemap_for_pages(response.text)
+                    urls = self._parse_sitemap(response.text, "", processed_sitemaps)
                     page_urls.update(urls)
             except Exception as e:
                 print(f"Errore nell'analisi sitemap {sitemap_url}: {str(e)}")
@@ -188,25 +164,10 @@ class SEOAnalyzer:
         return list(page_urls)[:self.max_pages]
     
     def _parse_sitemap_for_pages(self, sitemap_content: str) -> List[str]:
-        """Estrae gli URL delle pagine da una sitemap XML"""
-        urls = []
-        try:
-            # Cerca pattern URL nelle sitemap XML
-            import re
-            url_pattern = r'<loc>(.*?)</loc>'
-            found_urls = re.findall(url_pattern, sitemap_content)
-            
-            for url in found_urls:
-                if url and url.startswith('http') and not url.endswith('.xml'):
-                    # Escludi altre sitemap, prendi solo pagine
-                    if 'sitemap' not in url.lower():
-                        urls.append(url.strip())
-                        
-        except Exception as e:
-            print(f"Errore nel parsing sitemap: {str(e)}")
-        
-        return urls
-    
+        # Metodo helper mantenuto per compatibilità
+        return self._parse_sitemap(sitemap_content, "", set())
+
+    # --- MODIFICA 3: BLACKLIST NEL SCANNER ---
     def scan_website_pages(self, base_url: str, sitemap_urls: List[str]) -> List[Dict]:
         """Scansiona le pagine del sito web estraendole dalle sitemap"""
         pages_data = []
@@ -225,15 +186,20 @@ class SEOAnalyzer:
         # Aggiungi sempre l'URL base
         urls_to_scan.add(base_url)
         
-        # Limita il numero di pagine
-        urls_to_scan = list(urls_to_scan)[:self.max_pages]
+        # --- FILTRO BLACKLIST ---
+        excluded_patterns = ['privacy-policy', 'cookie-policy', 'terms-and-conditions', 'condizioni', 'termini', 'policy', 'legal']
+        final_urls = []
+        for url in list(urls_to_scan)[:self.max_pages]:
+            if any(p in url.lower() for p in excluded_patterns):
+                continue
+            final_urls.append(url)
         
-        for url in urls_to_scan:
+        for url in final_urls:
             try:
                 page_data = self._analyze_page(url)
                 if page_data:
                     pages_data.append(page_data)
-                time.sleep(0.5)
+                time.sleep(1) # Pausa leggermente aumentata per Selenium
             except Exception as e:
                 print(f"Errore nell'analisi di {url}: {str(e)}")
                 continue
@@ -264,50 +230,36 @@ class SEOAnalyzer:
         
         return list(discovered_urls)
     
+    # --- MODIFICA 4: ANALISI CON SELENIUM ---
     def _analyze_page(self, url: str) -> Dict:
         """Analizza una singola pagina"""
         start_time = time.time()
         
         try:
-            response = self.session.get(url, timeout=self.timeout)
+            # Uso Selenium se disponibile
+            if self.driver:
+                self.driver.get(url)
+                time.sleep(3) # Aspetto il caricamento di Flazio
+                page_source = self.driver.page_source
+                soup = BeautifulSoup(page_source, 'html.parser')
+                status_code = 200
+            else:
+                response = self.session.get(url, timeout=self.timeout)
+                soup = BeautifulSoup(response.content, 'html.parser')
+                status_code = response.status_code
+
             response_time = time.time() - start_time
             
-            if response.status_code != 200:
-                return {
-                    'url': url,
-                    'status_code': response.status_code,
-                    'response_time': response_time,
-                    'error': f"HTTP {response.status_code}"
-                }
-            
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Estrae contenuto con trafilatura, se fallisce usa BeautifulSoup
-            text_content = ""
-            try:
-                text_content = trafilatura.extract(response.text) or ""
-                
-                # Se trafilatura non trova contenuto, prova con BeautifulSoup
-                if not text_content or len(text_content.strip()) < 50:
-                    # Rimuovi script e style tags
-                    soup_copy = BeautifulSoup(response.content, 'html.parser')
-                    for script in soup_copy(["script", "style", "nav", "header", "footer"]):
-                        script.decompose()
-                    text_content = soup_copy.get_text()
-                    # Pulisci il testo
-                    lines = (line.strip() for line in text_content.splitlines())
-                    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-                    text_content = ' '.join(chunk for chunk in chunks if chunk)
-            except:
-                # Fallback finale
-                try:
-                    text_content = soup.get_text()
-                except:
-                    text_content = ""
+            # Pulizia per il conteggio caratteri (evita i falsi positivi dei 50 caratteri)
+            clean_soup = BeautifulSoup(str(soup), 'html.parser')
+            for script in clean_soup(["script", "style", "nav", "header", "footer", "noscript"]):
+                script.decompose()
+            text_content = clean_soup.get_text(separator=' ')
+            text_content = ' '.join(text_content.split()) # Rimuove spazi doppi
             
             return {
                 'url': url,
-                'status_code': response.status_code,
+                'status_code': status_code,
                 'response_time': response_time,
                 'title': self._extract_title(soup),
                 'meta_description': self._extract_meta_description(soup),
@@ -332,6 +284,8 @@ class SEOAnalyzer:
                 'error': str(e)
             }
     
+    # --- DA QUI IN POI È TUTTO IL TUO CODICE ORIGINALE INTATTO ---
+
     def _extract_title(self, soup: BeautifulSoup) -> str:
         """Estrae il titolo della pagina"""
         title_tag = soup.find('title')
@@ -397,7 +351,7 @@ class SEOAnalyzer:
                 # Controlla se è davvero un H1 tramite attributi o posizione
                 parent = elem.parent
                 if parent and ('h1' in str(parent.get('class', [])).lower() or 
-                              elem.get('data-level') == '1'):
+                             elem.get('data-level') == '1'):
                     text = elem.get_text(strip=True)
                     if text and 5 < len(text) < 300:
                         headings['h1'].append(f"[Elementor H1] {text}")
@@ -434,7 +388,7 @@ class SEOAnalyzer:
             for elem in elementor_h2:
                 parent = elem.parent
                 if parent and ('h2' in str(parent.get('class', [])).lower() or 
-                              elem.get('data-level') == '2'):
+                             elem.get('data-level') == '2'):
                     text = elem.get_text(strip=True)
                     if text and 3 < len(text) < 200 and text not in [h['text'] for h in headings['h2'] if isinstance(h, dict)]:
                         headings['h2'].append(f"[Elementor H2] {text}")
@@ -455,7 +409,7 @@ class SEOAnalyzer:
             for elem in elementor_h3:
                 parent = elem.parent
                 if parent and ('h3' in str(parent.get('class', [])).lower() or 
-                              elem.get('data-level') == '3'):
+                             elem.get('data-level') == '3'):
                     text = elem.get_text(strip=True)
                     if text and 3 < len(text) < 200:
                         headings['h3'].append(f"[Elementor H3] {text}")
@@ -685,6 +639,67 @@ class SEOAnalyzer:
             return response.status_code == 200
         except:
             return False
+    
+    def analyze_robots_txt(self, base_url: str) -> Dict:
+        """Analizza il file robots.txt"""
+        robots_data = {
+            'found': False,
+            'content': '',
+            'disallow_rules': [],
+            'allow_rules': [],
+            'crawl_delay': None,
+            'sitemap_urls': [],
+            'user_agents': []
+        }
+        
+        try:
+            robots_url = f"{base_url.rstrip('/')}/robots.txt"
+            response = self.session.get(robots_url, timeout=self.timeout)
+            
+            if response.status_code == 200:
+                robots_data['found'] = True
+                robots_data['content'] = response.text
+                
+                current_user_agent = None
+                for line in response.text.split('\n'):
+                    line = line.strip()
+                    if line.startswith('#') or not line:
+                        continue
+                    
+                    if line.lower().startswith('user-agent:'):
+                        current_user_agent = line.split(':', 1)[1].strip()
+                        if current_user_agent not in robots_data['user_agents']:
+                            robots_data['user_agents'].append(current_user_agent)
+                    
+                    elif line.lower().startswith('disallow:'):
+                        rule = line.split(':', 1)[1].strip()
+                        robots_data['disallow_rules'].append({
+                            'user_agent': current_user_agent,
+                            'rule': rule
+                        })
+                    
+                    elif line.lower().startswith('allow:'):
+                        rule = line.split(':', 1)[1].strip()
+                        robots_data['allow_rules'].append({
+                            'user_agent': current_user_agent,
+                            'rule': rule
+                        })
+                    
+                    elif line.lower().startswith('crawl-delay:'):
+                        delay = line.split(':', 1)[1].strip()
+                        try:
+                            robots_data['crawl_delay'] = int(delay)
+                        except:
+                            pass
+                    
+                    elif line.lower().startswith('sitemap:'):
+                        sitemap_url = line.split(':', 1)[1].strip()
+                        robots_data['sitemap_urls'].append(sitemap_url)
+        
+        except:
+            pass
+        
+        return robots_data
     
     def analyze_seo_factors(self, pages_data: List[Dict], base_url: str) -> Dict:
         """Analizza i fattori SEO per tutte le pagine"""
